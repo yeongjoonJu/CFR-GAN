@@ -6,6 +6,7 @@ from networks import VGG19
 from utils import load_state_dict
 from torch.autograd import Variable
 
+
 class VGGLoss(nn.Module):
     def __init__(self):
         super(VGGLoss, self).__init__()
@@ -21,9 +22,9 @@ class VGGLoss(nn.Module):
                 loss += self.weights[i] * self.criterion(x_vgg[i], y_vgg[i].detach())
         return loss
 
-class Perceptual_loss(nn.Module):
+class RESLoss(nn.Module):
     def __init__(self):
-        super(Perceptual_loss, self).__init__()
+        super(RESLoss, self).__init__()
         self.criterion = nn.L1Loss()
         resnet = resnet50(pretrained=True)
 
@@ -51,7 +52,7 @@ class Perceptual_loss(nn.Module):
 
 
 class WGAN_DIV_Loss(nn.Module):
-    def __init__(self, k=2, p=6, dim=980):
+    def __init__(self, k=2, p=6, dim=289):
         super(WGAN_DIV_Loss, self).__init__()
         self.k = k
         self.p = p
@@ -72,5 +73,9 @@ class WGAN_DIV_Loss(nn.Module):
 
         # WGAN-DIV loss
         loss_D = -torch.mean(real_val) + torch.mean(fake_val) + div_gp
+        # Spectral normalization loss
+        # loss_D = torch.mean(F.relu(-1 + real_val)) + torch.mean(F.relu(-1-fake_val))
     
         return loss_D
+    
+
