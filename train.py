@@ -74,11 +74,11 @@ parser.add_argument('--valid_iter', default=250, type=int)
 parser.add_argument('--check_iter', default=5000, type=int)
 parser.add_argument('--checkpoint_path', default='saved_models', type=str, help='path to save checkpoints')
 parser.add_argument('--perceptual_model', default='resnet', type=str, help='vgg or resnet')
-parser.add_argument('--img_path', required=True, type=str, help="original image path")
-parser.add_argument('--train_data_path', required=True, type=str, help="CFR-GAN train image data path")
-parser.add_argument('--valid_data_path', required=True, type=str, help="CFR-GAN valid image data path")
-parser.add_argument('--train_data_list', required=True, type=str, help="Train image list path")
-parser.add_argument('--valid_data_list', required=True, type=str, help="Valid image list path")
+parser.add_argument('--img_path', default="/media/storage/face_cropped_224", type=str, help="original image path")
+parser.add_argument('--train_data_path', default="/media/storage/cfrgan_train_224", type=str, help="CFR-GAN train image data path")
+parser.add_argument('--valid_data_path', default="/media/storage/cfrgan_test_224", type=str, help="CFR-GAN valid image data path")
+parser.add_argument('--train_data_list', default="cfrgan_trainset.txt", type=str, help="Train image list path")
+parser.add_argument('--valid_data_list', default="cfrgan_test.txt", type=str, help="Valid image list path")
 
 logger = CFRLogger('logs')
 
@@ -174,10 +174,10 @@ def main_worker(gpu, ngpus_per_node, args):
             netD.load_state_dict(checkpoint['D_state_dict'])
             optimizer_G.load_state_dict(checkpoint['G_optimizer'])
             optimizer_D.load_state_dict(checkpoint['D_optimizer'])            
-            for g in optimizer_G.param_groups:
-                g['lr'] = checkpoint['G_lr']
-            for g in optimizer_D.param_groups:
-                g['lr'] = checkpoint['D_lr']
+            # for g in optimizer_G.param_groups:
+            #     g['lr'] = checkpoint['G_lr']
+            # for g in optimizer_D.param_groups:
+            #     g['lr'] = checkpoint['D_lr']
     else:
         netG = DDP(netG.cuda(), broadcast_buffers=False, find_unused_parameters=True)
         netD = DDP(netD.cuda(), broadcast_buffers=False, find_unused_parameters=True)
@@ -242,8 +242,8 @@ def main_worker(gpu, ngpus_per_node, args):
                 'D_state_dict': nets['D'].state_dict(),
                 'G_optimizer': optimizers['G'].state_dict(),
                 'D_optimizer': optimizers['D'].state_dict(),
-                'G_lr' : schedulers['G'].get_last_lr(),
-                'D_lr' : schedulers['D'].get_last_lr()
+                # 'G_lr' : schedulers['G'].get_last_lr(),
+                # 'D_lr' : schedulers['D'].get_last_lr()
             }, args.checkpoint_path, epoch, len(train_loader)*(epoch+1))
 
             torch.save(nets['G'].state_dict(), args.checkpoint_path + '/CFRNet_G_ep{}.pth'.format(epoch+1))
@@ -265,8 +265,8 @@ def train(train_loader, valid_loader, nets, criterions, optimizers, schedulers, 
         Per_coef = 2.0
         GAN_coef = 1.0
         Occ_coef = 2.0
-        Face_coef = 1.5
-        Rec_coef = 0.25
+        Face_coef = 1.0
+        Rec_coef = 0.1
     else:
         raise ValueError('Model type should be one of resnet or vgg')
     
@@ -392,8 +392,8 @@ def train(train_loader, valid_loader, nets, criterions, optimizers, schedulers, 
                     'D_state_dict': nets['D'].state_dict(),
                     'G_optimizer': optimizers['G'].state_dict(),
                     'D_optimizer': optimizers['D'].state_dict(),
-                    'G_lr' : schedulers['G'].get_last_lr(),
-                    'D_lr' : schedulers['D'].get_last_lr()
+                    # 'G_lr' : schedulers['G'].get_last_lr(),
+                    # 'D_lr' : schedulers['D'].get_last_lr()
                 }, args.checkpoint_path, epoch, len(train_loader)*(epoch+1))
             
             if (i+1) % args.valid_iter == 0:
