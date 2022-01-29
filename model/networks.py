@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from torchvision.models import vgg16, vgg19, resnet18
-from layers import *
+from model.layers import *
 
 
 class VGG19(torch.nn.Module):
@@ -80,7 +80,7 @@ class CFRNet(nn.Module):
             nn.InstanceNorm2d(64), nn.LeakyReLU(0.2, True),
         )
 
-        self.afd_256 = AFD(64, 64)
+        self.afd = AFD(64, 64)
         
         self.downsample = nn.ModuleList([
             StridedGatedConv(64, 128, kernel_size=3), # 128
@@ -113,18 +113,15 @@ class CFRNet(nn.Module):
     
     def forward(self, rotated, guidance, wo_mask=False):
         # Normalize
-        # rotated = (rotated - 0.5) * 2
         rotated = self.conv_r(rotated)
-
-        # guidance = (guidance - 0.5) * 2
         guidance = self.conv_g(guidance)
 
-        diff = self.afd_256(rotated, guidance)
+        diff = self.afd(rotated, guidance)
         attn = self.sigmoid(diff)
 
         out, gate1 = self.downsample[0](rotated*(1.-attn)) # 128
         out, gate2 = self.downsample[1](out) # 64
-               
+
         out = self.resblocks(out)
         out = self.upsample(out)
         out = self.last_conv(out)
@@ -136,6 +133,12 @@ class CFRNet(nn.Module):
         
         return out, mask
     
+    def init_weight(self):
+        for ly in self.children():
+            if isinstance(ly, nn.Conv2d):
+                nn.init.kaiming_normal_(ly.weight, a=1)
+                if not ly.bias is None: nn.init.constant_(ly.bias, 0)
+    
 
 class Discriminator(nn.Module):
     def __init__(self):
@@ -146,12 +149,20 @@ class Discriminator(nn.Module):
             SNConvWithActivation(128, 256, 4, 2, padding=2), # 32 / 28
             SNConvWithActivation(256, 512, 4, 2, padding=2),
             SNConv(512, 1, kernel_size=1, stride=1, padding=0)
+
         )
+        self.init_weight()
 
     def forward(self, x):
         out = self.net(x)
         out = out.view(out.size(0), -1)
         return out
+    
+    def init_weight(self):
+        for ly in self.children():
+            if isinstance(ly, nn.Conv2d):
+                nn.init.kaiming_normal_(ly.weight, a=1)
+                if not ly.bias is None: nn.init.constant_(ly.bias, 0)
 
 
 class TwoScaleDiscriminator(nn.Module):
@@ -167,9 +178,3 @@ class TwoScaleDiscriminator(nn.Module):
         out2 = self.D2(self.downsample(x))
 
         return [out1, out2]
-        
-    def init_weight(self):
-        for ly in self.children():
-            if isinstance(ly, nn.Conv2d):
-                nn.init.kaiming_normal_(ly.weight, a=1)
-                if not ly.bias is None: nn.init.constant_(ly.bias, 0)

@@ -2,9 +2,23 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from torchvision.models import resnet50
-from networks import VGG19
-from utils import load_state_dict
+from model.networks import VGG19
+# from utils import load_state_dict
 from torch.autograd import Variable
+
+
+class PerceptualLoss(nn.Module):
+    def __init__(self, model_type='resnet'):
+        super(PerceptualLoss, self).__init__()
+        if model_type=='resnet':
+            self.criterion = ResLoss()
+        elif model_type=='vgg':
+            self.criterion = VGGLoss()
+        else:
+            raise ValueError('Model type should be one of resnet or vgg')
+    
+    def forward(self, y_hat, y):
+        return self.criterion(y_hat, y)
 
 
 class VGGLoss(nn.Module):
@@ -14,17 +28,16 @@ class VGGLoss(nn.Module):
         self.criterion = nn.MSELoss()
         self.weights = [1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0]
 
-    def forward(self, x, y, layer=0):
+    def forward(self, x, y):
         x_vgg, y_vgg = self.vgg(x), self.vgg(y)
         loss = 0
         for i in range(len(x_vgg)):
-            if i >= layer:
-                loss += self.weights[i] * self.criterion(x_vgg[i], y_vgg[i].detach())
+            loss += self.weights[i] * self.criterion(x_vgg[i], y_vgg[i].detach())
         return loss
 
-class RESLoss(nn.Module):
+class ResLoss(nn.Module):
     def __init__(self):
-        super(RESLoss, self).__init__()
+        super(ResLoss, self).__init__()
         self.criterion = nn.L1Loss()
         resnet = resnet50(pretrained=True)
 
