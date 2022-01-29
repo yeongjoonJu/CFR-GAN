@@ -13,6 +13,6 @@ We present a self-supervision strategy called Swap-R&R to overcome the lack of g
 
 <img src="figure/stages.png" style="zoom:80%;" />
 
-**\*\*The codes implemented for Swap-R&R and CFR-GAN will be updated later.\*\***
+**\*\*README and trained weights will be updated soon.\*\***
 
 Training codes for occlusion robust 3D face reconstruction in this paper are available in [here](https://github.com/yeongjoonJu/Occlusion-Robust-3D-Face-CFR-GAN).
