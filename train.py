@@ -140,7 +140,7 @@ def main_worker(gpu, ngpus_per_node, args):
     netG = CFRNet()
     netD = TwoScaleDiscriminator()
     
-    criterion_per = PerceptualLoss()
+    criterion_per = PerceptualLoss(model_type=args.perceptual_model)
     criterion_l1 = torch.nn.L1Loss()
     criterion_l2 = torch.nn.MSELoss()
     criterion_wdiv = WGAN_DIV_Loss()
@@ -174,10 +174,10 @@ def main_worker(gpu, ngpus_per_node, args):
             netD.load_state_dict(checkpoint['D_state_dict'])
             optimizer_G.load_state_dict(checkpoint['G_optimizer'])
             optimizer_D.load_state_dict(checkpoint['D_optimizer'])            
-            # for g in optimizer_G.param_groups:
-            #     g['lr'] = checkpoint['G_lr']
-            # for g in optimizer_D.param_groups:
-            #     g['lr'] = checkpoint['D_lr']
+            for g in optimizer_G.param_groups:
+                g['lr'] = checkpoint['G_lr']
+            for g in optimizer_D.param_groups:
+                g['lr'] = checkpoint['D_lr']
     else:
         netG = DDP(netG.cuda(), broadcast_buffers=False, find_unused_parameters=True)
         netD = DDP(netD.cuda(), broadcast_buffers=False, find_unused_parameters=True)
@@ -220,11 +220,11 @@ def main_worker(gpu, ngpus_per_node, args):
     valid_loader = torch.utils.data.DataLoader(
         valid_dataset, batch_size=args.batch_size, shuffle=False, drop_last=True, num_workers=args.workers, pin_memory=True)
 
-    # scheduler_D = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_D, T_max=args.epochs*len(train_loader))
-    # scheduler_G = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_G, T_max=args.epochs*len(train_loader))
+    scheduler_D = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_D, T_max=len(train_loader)*5, eta_min=1e-8)
+    scheduler_G = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_G, T_max=len(train_loader)*5, eta_min=1e-8)
     schedulers = {}
-    # schedulers['G'] = scheduler_G
-    # schedulers['D'] = scheduler_D
+    schedulers['G'] = scheduler_G
+    schedulers['D'] = scheduler_D
 
     for epoch in range(args.start_epoch, args.epochs):    
         if args.distributed:
@@ -242,11 +242,11 @@ def main_worker(gpu, ngpus_per_node, args):
                 'D_state_dict': nets['D'].state_dict(),
                 'G_optimizer': optimizers['G'].state_dict(),
                 'D_optimizer': optimizers['D'].state_dict(),
-                # 'G_lr' : schedulers['G'].get_last_lr(),
-                # 'D_lr' : schedulers['D'].get_last_lr()
+                'G_lr' : schedulers['G'].get_last_lr(),
+                'D_lr' : schedulers['D'].get_last_lr()
             }, args.checkpoint_path, epoch, len(train_loader)*(epoch+1))
 
-            torch.save(nets['G'].state_dict(), args.checkpoint_path + '/CFRNet_G_ep{}.pth'.format(epoch+1))
+            torch.save(nets['G'].state_dict(), args.checkpoint_path + '/CFRNet_G_ep{}_vgg.pth'.format(epoch+1))
 
 def train(train_loader, valid_loader, nets, criterions, optimizers, schedulers, epoch, args):
     val_iter = iter(valid_loader)
@@ -256,17 +256,17 @@ def train(train_loader, valid_loader, nets, criterions, optimizers, schedulers, 
     nets['D'].train()
 
     if args.perceptual_model=='vgg':
-        Per_coef = 0.35
+        Per_coef = 1.0
         GAN_coef = 1.0
-        Occ_coef = 2.0
-        Face_coef = 1.5
-        Rec_coef = 0.25    
+        Occ_coef = 3.0
+        Face_coef = 2.5
+        Rec_coef = 0.3
     elif args.perceptual_model=='resnet':
-        Per_coef = 2.0
+        Per_coef = 4.0
         GAN_coef = 1.0
         Occ_coef = 2.0
         Face_coef = 1.0
-        Rec_coef = 0.1
+        Rec_coef = 0.07
     else:
         raise ValueError('Model type should be one of resnet or vgg')
     
@@ -379,10 +379,10 @@ def train(train_loader, valid_loader, nets, criterions, optimizers, schedulers, 
                     sys.stdout.write("\r[Epoch %d/%d] [Batch %d/%d]" % (epoch, args.epochs, i, len(train_loader)))
                     logger.log_training(loss_D.item(), loss_GAN.item(), loss_occ_mask.item(), loss_per.item(), loss_rec.item(), loss_id.item(), total_iter)
                 
-                # schedulers['G'].step()
+                schedulers['G'].step()
 
         if torch.distributed.get_rank() == 0: 
-            # schedulers['D'].step()
+            schedulers['D'].step()
 
             if i!=0 and i % args.check_iter == 0:
                 # save checkpoint
@@ -392,8 +392,8 @@ def train(train_loader, valid_loader, nets, criterions, optimizers, schedulers, 
                     'D_state_dict': nets['D'].state_dict(),
                     'G_optimizer': optimizers['G'].state_dict(),
                     'D_optimizer': optimizers['D'].state_dict(),
-                    # 'G_lr' : schedulers['G'].get_last_lr(),
-                    # 'D_lr' : schedulers['D'].get_last_lr()
+                    'G_lr' : schedulers['G'].get_last_lr(),
+                    'D_lr' : schedulers['D'].get_last_lr()
                 }, args.checkpoint_path, epoch, len(train_loader)*(epoch+1))
             
             if (i+1) % args.valid_iter == 0:
@@ -432,9 +432,9 @@ def train(train_loader, valid_loader, nets, criterions, optimizers, schedulers, 
 
 def save_checkpoint(state, save_path, epoch, iteration=None):
     if iteration is not None:
-        checkpoint_name = 'checkpoint_ep%d_it%d.pth' % (epoch+1, iteration)
+        checkpoint_name = 'checkpoint_ep%d_it%d_vgg.pth' % (epoch+1, iteration)
     else:
-        checkpoint_name = 'checkpoint_ep%d.pth' % (epoch+1)
+        checkpoint_name = 'checkpoint_ep%d_vgg.pth' % (epoch+1)
     
     torch.save(state, os.path.join(save_path, checkpoint_name))
     
