@@ -13,7 +13,7 @@ import torch
 import numpy as np
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-import cv2
+import cv2, glob
 # from torchsummary import summary
 from pytorch3d.structures import Meshes
 from pytorch3d.renderer import Textures
@@ -25,7 +25,7 @@ from pytorch3d.renderer import (
     BlendParams,
     MeshRenderer, MeshRasterizer
 )
-
+from tqdm import tqdm
 from utils.ops import erosion, SCDiffer, dilation, blur
 
 # Retina Face
@@ -362,13 +362,13 @@ class Estimator3D(object):
         return colors
 
 
-    def swap_and_rotate_and_render(self, image, ori_img, parsing_net, scd):
+    def swap_and_rotate_and_render(self, image, parsing_net, scd):
         # Regress 3DMM parameters
         coef = self.regress_3dmm(image) # RGB2BGR
         # Reconstruct shape and color from 3DMM parameters
-        face_shape, ori_angles, translation, face_color, _, face_projection, z_buffer, front_face = Reconstruction(coef,self.face_model, front=True)
+        face_shape, ori_angles, translation, face_color, _, face_projection, z_buffer, front_face = Reconstruction(coef,self.face_model)
         # get color value from image
-        color_from_img = self.get_colors_from_image(ori_img, face_projection, z_buffer, normalized=True)
+        color_from_img = self.get_colors_from_image(image, face_projection, z_buffer, normalized=True)
 
         # Mesh with color from image
         rot = Meshes(verts=face_shape, faces=self.tri[:image.shape[0],...], textures=Textures(verts_rgb=color_from_img))
@@ -383,7 +383,7 @@ class Estimator3D(object):
         gui_ori = gui.permute(0,3,1,2)[:,[2,1,0],...]
 
         # Swap
-        mask_only_obj = self.get_occlusion_mask(parsing_net, scd, rot, gui_ori, ori_img[:,[2,1,0],...], obj=True)
+        mask_only_obj = self.get_occlusion_mask(parsing_net, scd, rot, gui_ori, image[:,[2,1,0],...], obj=True)
         blur_mask_o = blur(dilation(mask_only_obj, filter_size=3), filter_size=3)
         rot = image[:,[2,1,0],...]*(1.-blur_mask_o) + gui_ori*blur_mask_o
 
@@ -425,7 +425,7 @@ class Estimator3D(object):
         rot = self.phong_renderer(meshes_world=rot, R=self.R, T=self.T)
         rot = torch.clamp(rot[...,:3], 0.0, 1.0)
 
-        occ_mask = self.get_occlusion_mask(parsing_net, scd, rot.permute(0,3,1,2), gui, ori_img[:,[2,1,0],...], obj=False) 
+        occ_mask = self.get_occlusion_mask(parsing_net, scd, rot.permute(0,3,1,2), gui, image[:,[2,1,0],...], obj=False) 
         occ_mask = (occ_mask*3 + mask_only_obj) / 4  # option
         
         # rendered, gui_ori.permute(0,2,3,1)
@@ -474,4 +474,43 @@ class Estimator3D(object):
         return rotated, guidance
     
 if __name__=='__main__':
-    pass
+    from faceParsing.model import BiSeNet
+    # params
+    batch_size = 2
+    cuda_id = 0
+    estimator_path = "saved_models/trained_weights_occ_3d.pth"
+    input_img_path = "./test_imgs/input"
+    save_path = "./test_imgs/output"
+    
+    # create models
+    # Face parsing network
+    bisenet = BiSeNet(n_classes=19)
+    bisenet.load_state_dict(torch.load('faceParsing/model_final_diss.pth', map_location='cuda:'+str(cuda_id)))
+    bisenet.cuda(cuda_id)
+    bisenet.eval()
+    # 3D face regressor
+    estimator = Estimator3D(batch_size=batch_size, render_size=224, test=True, model_path=estimator_path, cuda_id=cuda_id)
+    # structure and contrast difference
+    scd = SCDiffer()
+    
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+    
+    img_list = glob.glob(input_img_path + '/*.jpg')
+    print('The number of images:', len(img_list))
+    
+    for i in tqdm(range(0, len(img_list), batch_size)):
+        until = i+batch_size
+        if until > len(img_list):
+            until = len(img_list)
+        input_img = estimator.align_convert2tensor(img_list[i:until], aligned=True)
+        rot, gui, occ_mask = estimator.swap_and_rotate_and_render(input_img, bisenet, scd)
+        
+        occ_mask = occ_mask.permute(0,2,3,1).cpu().numpy() * 255.0
+        gui = gui.cpu().numpy() * 255.0
+        rot = rot.cpu().numpy() * 255.0
+                        
+        for k in range(rot.shape[0]):
+            cv2.imwrite(os.path.join(save_path,os.path.basename(img_list[i+k])[:-4]+'_occ.jpg'), occ_mask[k])
+            cv2.imwrite(os.path.join(save_path,os.path.basename(img_list[i+k])[:-4]+'_rot.jpg'), cv2.cvtColor(rot[k], cv2.COLOR_RGB2BGR))
+            cv2.imwrite(os.path.join(save_path,os.path.basename(img_list[i+k])[:-4]+'_gui.jpg'), cv2.cvtColor(gui[k], cv2.COLOR_RGB2BGR))

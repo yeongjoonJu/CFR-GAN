@@ -21,13 +21,23 @@ We present a self-supervision strategy called Swap-R&R to overcome the lack of g
 
 2) Download BFM_model_80.mat and 3D face estimator weights [here](https://github.com/yeongjoonJu/Occlusion-Robust-3D-Face-CFR-GAN/blob/main/readme.md).
 
-3) Generate de-occluded and rotated face images given a pose.
+**Generate de-occluded and rotated face images given a pose.**
 
 ~~~bash
 python inference.py --img_path test_imgs/input --save_path test_imgs/output --generator_path [saved_path] --estimator_path [saved_path]
 ~~~
 
-If you want to use your images, you should align images. Please refer to [this repo](https://github.com/yeongjoonJu/Occlusion-Robust-3D-Face-CFR-GAN) for alignment.
+**Generate training data pairs from your data!!**
+
+~~~
+python generate_pair.py
+~~~
+
+Please check parameters of main in the code.
+
+**!! If you want to use your images, you should align images. Please refer to [this repo](https://github.com/yeongjoonJu/Occlusion-Robust-3D-Face-CFR-GAN) for alignment. !!**
+
+
 
 ## Citation
 
