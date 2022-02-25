@@ -246,7 +246,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'D_lr' : schedulers['D'].get_last_lr()
             }, args.checkpoint_path, epoch, len(train_loader)*(epoch+1))
 
-            torch.save(nets['G'].state_dict(), args.checkpoint_path + '/CFRNet_G_ep{}_vgg.pth'.format(epoch+1))
+            torch.save(nets['G'].state_dict(), args.checkpoint_path + '/CFRNet_G_ep{}.pth'.format(epoch+1))
 
 def train(train_loader, valid_loader, nets, criterions, optimizers, schedulers, epoch, args):
     val_iter = iter(valid_loader)
@@ -256,13 +256,13 @@ def train(train_loader, valid_loader, nets, criterions, optimizers, schedulers, 
     nets['D'].train()
 
     if args.perceptual_model=='vgg':
-        Per_coef = 1.0
+        Per_coef = 0.9
         GAN_coef = 1.0
         Occ_coef = 3.0
         Face_coef = 2.5
         Rec_coef = 0.3
     elif args.perceptual_model=='resnet':
-        Per_coef = 4.0
+        Per_coef = 3.0
         GAN_coef = 1.0
         Occ_coef = 2.0
         Face_coef = 1.0
@@ -432,9 +432,9 @@ def train(train_loader, valid_loader, nets, criterions, optimizers, schedulers, 
 
 def save_checkpoint(state, save_path, epoch, iteration=None):
     if iteration is not None:
-        checkpoint_name = 'checkpoint_ep%d_it%d_vgg.pth' % (epoch+1, iteration)
+        checkpoint_name = 'checkpoint_ep%d_it%d.pth' % (epoch+1, iteration)
     else:
-        checkpoint_name = 'checkpoint_ep%d_vgg.pth' % (epoch+1)
+        checkpoint_name = 'checkpoint_ep%d.pth' % (epoch+1)
     
     torch.save(state, os.path.join(save_path, checkpoint_name))
     

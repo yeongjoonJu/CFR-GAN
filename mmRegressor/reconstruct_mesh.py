@@ -206,7 +206,7 @@ def Illumination_layer(face_texture, norm, gamma):
     return face_color,lighting
 
 # face reconstruction with coeff and BFM model
-def Reconstruction(coeff,facemodel, front=False):
+def Reconstruction(coeff,facemodel):
     id_coeff,ex_coeff,tex_coeff,angles,gamma,translation = Split_coeff(coeff)
 
     # compute face shape
@@ -238,9 +238,7 @@ def Reconstruction(coeff,facemodel, front=False):
     # vertex index for each face of BFM model
     tri = facemodel.tri
 
-    front_face = None
-    if front:
-        front_face = face_shape
+    front_face = face_shape.clone()
 
     face_shape = torch.matmul(face_shape,rotation)
     face_shape = face_shape + torch.reshape(translation,[-1,1,3])

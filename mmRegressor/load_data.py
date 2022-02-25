@@ -2,30 +2,36 @@ import numpy as np
 from PIL import Image
 from scipy.io import loadmat,savemat
 from array import array
-import mmRegressor.lib_py.chj_file as chj_file
 import torch
 
 # define facemodel for reconstruction
 class BFM():
-    def __init__(self, fmodel):
+    def __init__(self, fmodel, gpu_id=0):
         self.fmodel = fmodel
+        self.to_torch(gpu_id)
 
-    def to_torch(self, is_torch=True, is_cuda=False, device_id=0):
-        self.model = chj_file.load_np_mats(self.fmodel)
-        model = self.model[:5]
-        if is_torch:
-            model=[ torch.from_numpy(x) for x in model ]
-        if is_cuda and is_torch:
-            model = [x.cuda(device_id) for x in model]
+    def to_torch(self, gpu_id):
+        self.model = loadmat(self.fmodel)
 
-        self.meanshape = model[0]  # mean face shape
-        self.idBase = model[1]  # identity basis
-        self.exBase = model[2]  # expression basis
-        self.meantex = model[3]  # mean face texture
-        self.texBase = model[4]  # texture basis
-        self.tri = self.model[5]
-        self.keypoints = self.model[6]
-        self.point_buf = self.model[9]
+        if gpu_id != -1:
+            self.meanshape = torch.from_numpy(self.model['meanshape']).cuda(gpu_id).squeeze(0)  # mean face shape
+            self.idBase = torch.from_numpy(self.model['idBase']).cuda(gpu_id)  # identity basis
+            self.exBase = torch.from_numpy(self.model['exBase']).type(torch.FloatTensor).cuda(gpu_id)  # expression basis
+            self.meantex = torch.from_numpy(self.model['meantex']).cuda(gpu_id).squeeze(0)  # mean face texture
+            self.texBase = torch.from_numpy(self.model['texBase']).cuda(gpu_id)  # texture basis
+            self.skin_mask = torch.from_numpy(self.model['skinmask']).cuda(gpu_id)
+        else:
+            self.meanshape = torch.from_numpy(self.model['meanshape']).squeeze(0)  # mean face shape
+            self.idBase = torch.from_numpy(self.model['idBase'])  # identity basis
+            self.exBase = torch.from_numpy(self.model['exBase']).type(torch.FloatTensor)  # expression basis
+            self.meantex = torch.from_numpy(self.model['meantex']).squeeze(0)  # mean face texture
+            self.texBase = torch.from_numpy(self.model['texBase'])  # texture basis
+            self.skin_mask = torch.from_numpy(self.model['skinmask'])
+    
+        self.tri = self.model['tri']
+        self.keypoints = self.model['keypoints'].reshape(-1)
+        self.point_buf = self.model['point_buf']
+    
 
     # load landmarks for standard face, which is used for image preprocessing
     def load_lm3d(self, fsimilarity_Lm3D_all_mat):
@@ -39,6 +45,7 @@ class BFM():
         Lm3D = Lm3D[[1,2,0,3,4],:]
         self.Lm3D = Lm3D
         return Lm3D
+
 
 # load input images and corresponding 5 landmarks
 def load_img(img_path,lm_path):
@@ -62,8 +69,8 @@ def save_obj(path,v,f,c):
     file.close()
 
 if __name__=='__main__':
-    face_model = BFM("BFM/mSEmTFK68etc.chj")
-    face_model.to_torch(is_torch=True, is_cuda=True)
+    face_model = BFM("BFM/BFM_model_80.mat")
+    # face_model.to_torch(is_torch=True, is_cuda=True)
     print(face_model.meantex.shape, face_model.meantex)
     print(face_model.texBase.shape, face_model.texBase)
     print(face_model.exBase.shape, face_model.exBase)

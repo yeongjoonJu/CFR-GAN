@@ -93,12 +93,10 @@ class Estimator3D(object):
 
     def load_3dmm_models(self, model_path, test=True):
         # read face model
-        face_model = BFM('mmRegressor/BFM/BFM_model_80.mat', self.cuda_id)
-
-        self.face_model = face_model
+        self.face_model = BFM('mmRegressor/BFM/BFM_model_80.mat', self.cuda_id)
 
         # read standard landmarks for preprocessing images
-        self.lm3D = face_model.load_lm3d("mmRegressor/BFM/similarity_Lm3D_all.mat")
+        self.lm3D = self.face_model.load_lm3d("mmRegressor/BFM/similarity_Lm3D_all.mat")
         
         regressor = resnet50_use()
         if model_path is None:
@@ -325,6 +323,43 @@ class Estimator3D(object):
                     guide_obj[b] *= 0.1
 
             return guide_obj
+        
+        
+    def get_colors_from_image(self, image, proj, z_buffer, scaling=True, normalized=False, reverse=True, z_cut=None):
+        #image *= mask
+        if image.shape[1]==3 or image.shape[1]==4:
+            image = image.permute(0,2,3,1)
+        _, h, w, _ = image.shape
+
+        if scaling:
+            proj *= self.render_size / 224
+        
+        proj[...,0] = torch.clamp(proj[...,0], 0, w-1) # w
+        proj[...,1] = torch.clamp(proj[...,1], 0, h-1)
+        if reverse:
+            proj[...,1] = h - proj[...,1] - 1
+        idx = torch.round(proj).type(torch.long)
+
+        colors = None
+        for k in range(len(image)):                   
+            if colors is None:
+                colors = image[k, idx[k,:,1], idx[k,:,0]].unsqueeze(0)
+            else:
+                colors = torch.cat([colors, image[k, idx[k,:,1], idx[k,:,0]].unsqueeze(0)])
+
+        z_buffer = z_buffer.squeeze(2)
+        
+        if z_cut is not None:
+            colors = colors.repeat(2,1,1)
+            colors[:z_buffer.shape[0]][z_buffer < z_cut] = 0.0
+
+        if not normalized:
+            colors = colors/255
+
+        if self.is_cuda:
+            colors = colors.cuda(self.cuda_id)
+
+        return colors
 
 
     def swap_and_rotate_and_render(self, image, ori_img, parsing_net, scd):
@@ -333,7 +368,7 @@ class Estimator3D(object):
         # Reconstruct shape and color from 3DMM parameters
         face_shape, ori_angles, translation, face_color, _, face_projection, z_buffer, front_face = Reconstruction(coef,self.face_model, front=True)
         # get color value from image
-        color_from_img = self.get_colors_from_image(ori_img, face_projection, z_buffer, normalized=True, z_cut=-0.1)
+        color_from_img = self.get_colors_from_image(ori_img, face_projection, z_buffer, normalized=True)
 
         # Mesh with color from image
         rot = Meshes(verts=face_shape, faces=self.tri[:image.shape[0],...], textures=Textures(verts_rgb=color_from_img))
@@ -356,18 +391,18 @@ class Estimator3D(object):
         gui = gui*(1.-blur_mask_o) + blur_mask_o*blur(gui, filter_size=3)
 
         # get color value from image
-        color_from_img = self.get_colors_from_image(rot, face_projection, z_buffer, normalized=True, reverse=False, scaling=False, z_cut=-0.1)
+        color_from_img = self.get_colors_from_image(rot, face_projection, z_buffer, normalized=True, reverse=False, scaling=False)
         
         # Rotate and render
         # get random rotation angles and rotate (x:pitch, y:yaw, z:roll)
-        angles = torch.rand(rot.shape[0], 3).cuda(self.device_id) # -pi/2 ~ pi/2
+        angles = torch.rand(rot.shape[0], 3).cuda(self.cuda_id) # -pi/2 ~ pi/2
         angles[:,1] = (-math.pi*90/180 - math.pi*90/180) * angles[:,1] + math.pi*90/180  # -pi/2 ~ pi/2
         angles[:,[0,2]] = (-math.pi/12 - math.pi/12) * angles[:,[0,2]] + math.pi/12  # -pi/12 ~ pi/12
         angles[:,1] = torch.clamp(ori_angles[:,1] + angles[:,1], -math.pi/2, math.pi/2)
         angles[:,[0,2]] = torch.clamp(ori_angles[:,[0,2]] + angles[:,[0,2]], -math.pi/6, math.pi/6)
 
         rotation_m = Compute_rotation_matrix(angles)
-        rotated_shape = torch.matmul(front_face, rotation_m.cuda(self.device_id))
+        rotated_shape = torch.matmul(front_face, rotation_m.cuda(self.cuda_id))
 
         # Mesh with color from image
         rot = Meshes(verts=rotated_shape, faces=self.tri[:rot.shape[0],...], textures=Textures(verts_rgb=color_from_img))
@@ -376,7 +411,7 @@ class Estimator3D(object):
         
         # projection matrix
         if _need_const.gpu_p_matrix is None:
-            _need_const.gpu_p_matrix = _need_const.p_matrix.cuda(self.device_id)
+            _need_const.gpu_p_matrix = _need_const.p_matrix.cuda(self.cuda_id)
         p_matrix = _need_const.gpu_p_matrix.expand(rotated_shape.shape[0], 3, 3)
         aug_projection = rotated_shape.clone().detach()
         aug_projection[:,:,2] = _need_const.cam_pos - aug_projection[:,:,2]
@@ -385,7 +420,7 @@ class Estimator3D(object):
         z_buffer = _need_const.cam_pos - aug_projection[:,:,2:]
 
         # Re-texturing
-        color_from_img = self.get_colors_from_image(rot, face_projection, z_buffer, normalized=True, z_cut=-0.1)
+        color_from_img = self.get_colors_from_image(rot, face_projection, z_buffer, normalized=True)
         rot = Meshes(verts=face_shape, faces=self.tri[:rot.shape[0],...], textures=Textures(verts_rgb=color_from_img))
         rot = self.phong_renderer(meshes_world=rot, R=self.R, T=self.T)
         rot = torch.clamp(rot[...,:3], 0.0, 1.0)
@@ -396,14 +431,14 @@ class Estimator3D(object):
         # rendered, gui_ori.permute(0,2,3,1)
         return rot, gui.permute(0,2,3,1), occ_mask
 
-    def generate_testing_pairs(self, image, ori_img, pose=[5.0, 0.0, 0.0], front=False, landmark=False):
+    def generate_testing_pairs(self, image, pose=[5.0, 0.0, 0.0], front=False, landmark=False):
     
         # Regress 3DMM parameters
         coef = self.regress_3dmm(image) # RGB2BGR
         # Reconstruct shape and color from 3DMM parameters
-        face_shape, angles, _, face_color, _, face_projection, z_buffer, front_face = Reconstruction(coef,self.face_model, front=True)
+        face_shape, angles, _, face_color, _, face_projection, z_buffer, front_face = Reconstruction(coef,self.face_model)
         # get color value from image
-        color_from_img = self.get_colors_from_image(ori_img, face_projection, z_buffer, normalized=True, z_cut=-0.1)
+        color_from_img = self.get_colors_from_image(image, face_projection, z_buffer, normalized=True)
 
         if not front:
             # get rotation angles and rotate (x:pitch, y:yaw, z:roll)
@@ -411,11 +446,11 @@ class Estimator3D(object):
             angles = torch.zeros(coef.shape[0], 3)
             angles[:] = math.pi*pose/180
             rotation_m = Compute_rotation_matrix(angles)
-            rotated_shape = torch.matmul(front_face, rotation_m.cuda(self.device_id))
+            rotated_shape = torch.matmul(front_face, rotation_m.cuda(self.cuda_id))
         else:
             angles[:,[1,2]] = 0.0
             rotation_m = Compute_rotation_matrix(angles)
-        rotated_shape = torch.matmul(front_face, rotation_m.cuda(self.device_id))
+        rotated_shape = torch.matmul(front_face, rotation_m.cuda(self.cuda_id))
 
         # Mesh with color from image
         rotated = Meshes(verts=rotated_shape, faces=self.tri[:image.shape[0],...], textures=Textures(verts_rgb=color_from_img))
@@ -428,7 +463,7 @@ class Estimator3D(object):
 
         if landmark:
             face_projection, _ = Projection_layer(front_face, rotation_m, rotation_m.new_zeros(angles.shape[0],3))
-            landmarks_2d = torch.zeros_like(face_projection).cuda(self.device_id)
+            landmarks_2d = torch.zeros_like(face_projection).cuda(self.cuda_id)
             landmarks_2d[...,0] = torch.clamp(face_projection[...,0].clone(), 0, self.render_size-1)
             landmarks_2d[...,1] = torch.clamp(face_projection[...,1].clone(), 0, self.render_size-1)
             landmarks_2d[...,1] = self.render_size - landmarks_2d[...,1].clone() - 1

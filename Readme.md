@@ -7,12 +7,43 @@ Below images are frontalization and de-occlusion results. The first rows are the
 
 <img src="figure/app_samples.png" style="zoom:60%;" />
 
-### Abstract
+**Training codes for occlusion robust 3D face reconstruction in this paper are available in [here](https://github.com/yeongjoonJu/Occlusion-Robust-3D-Face-CFR-GAN).**
+
+## Abstract
 
 We present a self-supervision strategy called Swap-R&R to overcome the lack of ground-truth in a fully unsupervised manner for joint face rotation and de-occlusion. To generate an input pair for self-supervision, we transfer the occlusion from a face in an image to an estimated 3D face and create a damaged face image, as if rotated from a different pose by rotating twice with the roughly de-occluded face. Furthermore, we propose Complete Face Recovery GAN (CFR-GAN) to restore the collapsed textures and disappeared occlusion areas by leveraging the structural and textural differences between two rendered images. Unlike previous works, which have selected occlusion-free images to obtain ground-truths, our approach does not require human intervention and paired data.
 
 <img src="figure/stages.png" style="zoom:80%;" />
 
-**\*\*README and trained weights will be updated soon.\*\***
+## Quick start
 
-Training codes for occlusion robust 3D face reconstruction in this paper are available in [here](https://github.com/yeongjoonJu/Occlusion-Robust-3D-Face-CFR-GAN).
+1) Download [our trained weights](https://drive.google.com/file/d/1BrGzhXWsamD7X3w38fmPflmwiVkeLghP/view?usp=sharing).
+
+2) Download BFM_model_80.mat and 3D face estimator weights [here](https://github.com/yeongjoonJu/Occlusion-Robust-3D-Face-CFR-GAN/blob/main/readme.md).
+
+3) Generate de-occluded and rotated face images given a pose.
+
+~~~bash
+python inference.py --img_path test_imgs/input --save_path test_imgs/output --generator_path [saved_path] --estimator_path [saved_path]
+~~~
+
+If you want to use your images, you should align images. Please refer to [this repo](https://github.com/yeongjoonJu/Occlusion-Robust-3D-Face-CFR-GAN) for alignment.
+
+## Citation
+
+~~~
+@InProceedings{Ju_2022_WACV,
+    author    = {Ju, Yeong-Joon and Lee, Gun-Hee and Hong, Jung-Ho and Lee, Seong-Whan},
+    title     = {Complete Face Recovery GAN: Unsupervised Joint Face Rotation and De-Occlusion From a Single-View Image},
+    booktitle = {Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
+    month     = {January},
+    year      = {2022},
+    pages     = {3711-3721}
+}
+~~~
+
+## Acknowledgement
+
+~~~
+This work was supported by Institute of Information & communications Technology Planning Evaluation (IITP) grant funded by the Korea government(MSIT) (No. 2019-0-00079, Artificial Intelligence Graduate School Program(Korea University))
+~~~
