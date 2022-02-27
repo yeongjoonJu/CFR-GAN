@@ -37,7 +37,16 @@ Please check parameters of main in the code.
 
 **!! If you want to use your images, you should align images. Please refer to [this repo](https://github.com/yeongjoonJu/Occlusion-Robust-3D-Face-CFR-GAN) for alignment. !!**
 
+**Inference for non-aligned facial images**
 
+For alignment, You can use MTCNN or RetinaFace but we recommend to use [RetinaFace](https://github.com/biubug6/Pytorch_Retinaface).
+
+~~~bash
+git clone https://github.com/biubug6/Pytorch_Retinaface.git
+mkdir Pytorch_Retinaface/weights
+Download weights
+python inference.py --img_path [your image path] --save_path [your save path] --generator_path [saved_path] --estimator_path [saved_path] --aligner retinaface
+~~~
 
 ## Citation
 
