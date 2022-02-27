@@ -17,6 +17,8 @@ We present a self-supervision strategy called Swap-R&R to overcome the lack of g
 
 ## Quick start
 
+<img src="figure/suji_result.jpg" style="zoom:80%;" />
+
 1) Download [our trained weights](https://drive.google.com/file/d/1BrGzhXWsamD7X3w38fmPflmwiVkeLghP/view?usp=sharing).
 
 2) Download BFM_model_80.mat and 3D face estimator weights [here](https://github.com/yeongjoonJu/Occlusion-Robust-3D-Face-CFR-GAN/blob/main/readme.md).
