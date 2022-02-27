@@ -26,7 +26,7 @@ from pytorch3d.renderer import (
     MeshRenderer, MeshRasterizer
 )
 from tqdm import tqdm
-from utils.ops import erosion, SCDiffer, dilation, blur
+from tools.ops import erosion, SCDiffer, dilation, blur
 
 # Retina Face
 if os.path.exists('Pytorch_Retinaface'):

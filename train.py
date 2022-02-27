@@ -22,8 +22,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from model.networks import CFRNet, TwoScaleDiscriminator
 from model.losses import PerceptualLoss, WGAN_DIV_Loss
-from utils.datasets import CFRDataset
-from utils.logger import CFRLogger
+from tools.datasets import CFRDataset
+from tools.logger import CFRLogger
 import random
 from backbone import IR_SE_50
 
@@ -74,11 +74,11 @@ parser.add_argument('--valid_iter', default=250, type=int)
 parser.add_argument('--check_iter', default=5000, type=int)
 parser.add_argument('--checkpoint_path', default='saved_models', type=str, help='path to save checkpoints')
 parser.add_argument('--perceptual_model', default='resnet', type=str, help='vgg or resnet')
-parser.add_argument('--img_path', default="/media/storage/face_cropped_224", type=str, help="original image path")
-parser.add_argument('--train_data_path', default="/media/storage/cfrgan_train_224", type=str, help="CFR-GAN train image data path")
-parser.add_argument('--valid_data_path', default="/media/storage/cfrgan_test_224", type=str, help="CFR-GAN valid image data path")
-parser.add_argument('--train_data_list', default="cfrgan_trainset.txt", type=str, help="Train image list path")
-parser.add_argument('--valid_data_list', default="cfrgan_test.txt", type=str, help="Valid image list path")
+parser.add_argument('--img_path', default=None, required=True, type=str, help="original aligned image path")
+parser.add_argument('--train_data_path', default=None, required=True, type=str, help="CFR-GAN train image data path")
+parser.add_argument('--valid_data_path', default=None, required=True, type=str, help="CFR-GAN valid image data path")
+parser.add_argument('--train_data_list', default=None, required=True, type=str, help="Train image list path")
+parser.add_argument('--valid_data_list', default=None, required=True, type=str, help="Valid image list path")
 
 logger = CFRLogger('logs')
 

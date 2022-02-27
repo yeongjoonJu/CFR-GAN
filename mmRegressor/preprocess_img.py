@@ -29,13 +29,11 @@ def POS(xp,x):
     return t,s
 
 # It first uses this to roughly unify the shape, but actually put it in the center!!!
-def process_img(img,lm,t,s,render_size=224, mask=None):
+def process_img(img,lm,t,s,render_size=224):
     w0,h0 = img.size
     
     # This can change the size of the picture and put the face in the approximate center
     img = img.transform(img.size, Image.AFFINE, (1, 0, t[0] - w0/2, 0, 1, h0/2 - t[1]))
-    if mask is not None:
-        mask = mask.transform(mask.size, Image.AFFINE, (1, 0, t[0]-w0/2, 0, 1, h0/2 - t[1]))
     
     w = (w0/s*102).astype(np.int32)
     h = (h0/s*102).astype(np.int32)
@@ -51,17 +49,11 @@ def process_img(img,lm,t,s,render_size=224, mask=None):
     up_c = round(h0/h * up)
     below_c = round(h0/h * below)
     cropped_img = img.crop((left_c,up_c,right_c,below_c)).resize((render_size, render_size), resample=Image.BILINEAR)
-    # cropped_img = np.array(cropped_img)[:,:,::-1]
-    # cropped_img = np.expand_dims(cropped_img, 0)
     
     img = img.resize((w,h),resample = Image.BILINEAR)
-    if mask is not None:
-        mask = mask.resize((w,h), resample = Image.BILINEAR)
     lm = np.stack([lm[:,0] - t[0] + w0/2,lm[:,1] - t[1] + h0/2],axis = 1)/s*102 
 
     img = img.crop((left,up,right,below))
-    if mask is not None:
-        mask = mask.crop((left,up,right,below))
     
     img = np.array(img)
     if len(img.shape)==2:
@@ -70,16 +62,12 @@ def process_img(img,lm,t,s,render_size=224, mask=None):
     else:
         img = img[:,:,::-1] # Became BGR
     img = np.expand_dims(img,0)
-    if mask is not None:
-        mask = np.expand_dims(mask,0)
     lm = lm - np.reshape(np.array([(w/2 - 112),(h/2-112)]),[1,2])
 
-    return img, lm, mask, cropped_img, [left_c, right_c, up_c, below_c]
+    return img, lm, cropped_img, [left_c, right_c, up_c, below_c, render_size, t[0]-w0/2, h0/2-t[1]]
 
 
-# resize and crop input images before sending to the R-Net
-def Preprocess(img, lm, lm3D, mask=None, render_size=224):
-
+def Preprocess(img, lm, lm3D, render_size=224, box=False):
     w0,h0 = img.size
 
     # change from image plane coordinates to 3D sapce coordinates(X-Y plane)
@@ -90,31 +78,9 @@ def Preprocess(img, lm, lm3D, mask=None, render_size=224):
     t,s = POS(lm.transpose(),lm3D.transpose())
 
     # processing the image
-    img_new, lm_new, mask, cropped_img, box = process_img(img,lm,t,s,render_size, mask)
-    lm_new = np.stack([lm_new[:,0],223-lm_new[:,1]], axis = 1)
-    # trans_params = np.array([w0,h0,102.0/s,t[0][0],t[1][0]])
-    
-    no_mask_img = img_new
-    img_new = img_new * mask
-    input_img = img_new.astype(np.float32)
-    input_img = torch.from_numpy(input_img).permute(0,3,1,2)
+    img_new,  _, cropped_img, crop_box = process_img(img,lm,t,s,render_size)
 
-    return no_mask_img, input_img, cropped_img, box
-
-
-def PreprocessNoMask(img, lm, lm3D, render_size=224):
-    w0,h0 = img.size
-
-    # change from image plane coordinates to 3D sapce coordinates(X-Y plane)
-    lm = np.stack([lm[:,0],h0 - 1 - lm[:,1]], axis = 1)
-
-    # calculate translation and scale factors using 5 facial landmarks and standard landmarks
-	# lm3D -> lm
-    t,s = POS(lm.transpose(),lm3D.transpose())
-
-    # processing the image
-    img_new, _, _, cropped_img, _ = process_img(img,lm,t,s,render_size)
-    #lm_new = np.stack([lm_new[:,0],223-lm_new[:,1]], axis = 1)
-    # trans_params = np.array([w0,h0,102.0/s,t[0][0],t[1][0]])
+    if box:
+        return img_new, cropped_img, crop_box
 
     return img_new, cropped_img
