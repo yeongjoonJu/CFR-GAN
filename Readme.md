@@ -17,6 +17,8 @@ We present a self-supervision strategy called Swap-R&R to overcome the lack of g
 
 ## Quick start
 
+*Please read the document to the end before attempting with your images.*
+
 <img src="figure/suji_result.jpg" style="zoom:80%;" />
 
 1) Download [our trained weights](https://drive.google.com/file/d/1BrGzhXWsamD7X3w38fmPflmwiVkeLghP/view?usp=sharing).
