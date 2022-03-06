@@ -100,7 +100,8 @@ if __name__=='__main__':
         # input_img: BGR, cropped: RGB
         input_img = estimator3d.align_convert2tensor(img_list[k:until], aligned=(args.aligner is None))
         # rotated: RGB, guidance: BGR
-        rotated, guidance = estimator3d.generate_testing_pairs(input_img, pose=[5.0, -5.0, 0.0])
+        rotated, guidance = estimator3d.generate_testing_pairs(input_img, pose=[5.0, 0.0, 0.0])
+        # rotated, guidance = estimator3d.generate_testing_pairs(input_img, front=True)
 
         rotated = normalize(rotated[...,[2,1,0]].permute(0,3,1,2).contiguous())
         guidance = normalize(guidance[...,[2,1,0]].permute(0,3,1,2).contiguous())
