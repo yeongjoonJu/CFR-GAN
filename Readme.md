@@ -19,6 +19,8 @@ We present a self-supervision strategy called Swap-R&R to overcome the lack of g
 
 *Please read the document to the end before attempting with your images.*
 
+Our code was implemented in Ubuntu 16.04 and 18.04. So this code may not support any OS other than Linux OS
+
 <img src="figure/suji_result.jpg" style="zoom:80%;" />
 
 1) Download [our trained weights](https://drive.google.com/file/d/1BrGzhXWsamD7X3w38fmPflmwiVkeLghP/view?usp=sharing).
