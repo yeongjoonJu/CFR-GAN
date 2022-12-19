@@ -25,7 +25,7 @@ Our code was implemented in Ubuntu 16.04 and 18.04. So this code may not support
 
 <img src="figure/suji_result.jpg" style="zoom:80%;" />
 
-1) Download [our trained weights](https://drive.google.com/file/d/1BrGzhXWsamD7X3w38fmPflmwiVkeLghP/view?usp=sharing).
+1) Download [our trained weights](https://koreaoffice-my.sharepoint.com/:u:/g/personal/yj_ju_korea_ac_kr/EfiKe0BrN6JPo9sr_FX8JncBAtUBg7W0QiYi3ys39HkAiw?e=7nC08r).
 
 2) Download BFM_model_80.mat and 3D face estimator weights [here](https://github.com/yeongjoonJu/Occlusion-Robust-3D-Face-CFR-GAN/blob/main/readme.md).
 
